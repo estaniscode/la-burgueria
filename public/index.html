@@ -5,37 +5,36 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LA BURGUERÍA · Pedidos 24/7</title>
 <style>
-:root{--rojo:#e63946;--rojo-oscuro:#c1121f;--fondo:#1a0f0a;--panel:#2b1d16;--borde:#4a2c1d;--texto:#fff;--dorado:#ffc45e}
+:root{--rojo:#e63946;--fondo:#1a0f0a;--panel:#2b1d16;--borde:#4a2c1d;--texto:#fff;--dorado:#ffc45e}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui;background:var(--fondo);color:var(--texto);display:flex;flex-direction:column;height:100vh;overflow:hidden}
-header{background:var(--rojo);padding:14px;text-align:center;font-weight:800;font-size:20px;display:flex;align-items:center;justify-content:space-between;padding:14px 20px}
-header h1{font-size:20px}
+header{background:var(--rojo);padding:14px 20px;display:flex;align-items:center;justify-content:space-between}
+header h1{font-size:20px;font-weight:800}
+#mesaTag{font-size:12px;background:rgba(0,0,0,.25);border-radius:999px;padding:4px 10px;margin-left:6px;vertical-align:middle}
 .cart-btn{background:#fff;color:var(--rojo);border:none;border-radius:999px;padding:8px 16px;font-weight:700;cursor:pointer;position:relative;font-size:14px}
 .cart-count{position:absolute;top:-6px;right:-6px;background:var(--dorado);color:#000;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800}
 #msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px}
 .m{max-width:80%;padding:10px 14px;border-radius:14px;line-height:1.4;white-space:pre-wrap}
 .bot{background:var(--panel);align-self:flex-start;border:1px solid var(--borde)}
 .user{background:var(--rojo);align-self:flex-end}
+#mesaSelect{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;padding:10px 16px 0}
 .menu{display:flex;gap:10px;overflow-x:auto;padding:4px 16px 12px;flex-shrink:0;-webkit-overflow-scrolling:touch}
 .menu::-webkit-scrollbar{display:none}
-.item{background:var(--panel);border:1px solid var(--borde);border-radius:12px;padding:12px;cursor:pointer;transition:transform .2s;min-width:180px;max-width:180px;flex-shrink:0}
-.item:hover{transform:translateY(-2px);border-color:var(--rojo)}
+.item{background:var(--panel);border:1px solid var(--borde);border-radius:12px;padding:12px;min-width:180px;max-width:180px;flex-shrink:0}
 .item h3{font-size:15px;margin-bottom:4px;color:var(--dorado)}
 .item p{font-size:12px;color:#aaa;margin-bottom:8px}
-.item .precio{font-size:18px;font-weight:700;color:var(--texto)}
+.item .precio{font-size:18px;font-weight:700}
 .item button{width:100%;background:var(--rojo);border:none;color:#fff;border-radius:8px;padding:8px;font-weight:600;cursor:pointer;margin-top:8px}
 .chips{display:flex;gap:6px;padding:0 16px 12px;overflow-x:auto}
-.chip{background:var(--panel);border:1px solid var(--borde);border-radius:999px;padding:6px 12px;font-size:12px;cursor:pointer;white-space:nowrap}
+.chip{background:var(--panel);border:1px solid var(--borde);border-radius:999px;padding:6px 12px;font-size:12px;cursor:pointer;white-space:nowrap;color:var(--texto)}
 footer{display:flex;gap:8px;padding:10px;border-top:1px solid var(--borde)}
 input{flex:1;border:none;border-radius:10px;padding:12px;font-size:15px;background:var(--panel);color:var(--texto);border:1px solid var(--borde)}
 button.send{background:var(--rojo);border:none;color:#fff;border-radius:10px;padding:0 18px;font-weight:700;cursor:pointer}
-/* Modal carrito */
 .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:99;align-items:center;justify-content:center}
 .modal.show{display:flex}
 .modal-content{background:var(--panel);border-radius:16px;padding:20px;width:90%;max-width:500px;max-height:80vh;overflow-y:auto}
 .modal h2{margin-bottom:16px;color:var(--dorado)}
 .cart-item{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--borde)}
-.cart-item-info{flex:1}
 .cart-item-name{font-weight:600}
 .cart-item-price{font-size:12px;color:#aaa}
 .qty-controls{display:flex;align-items:center;gap:8px}
@@ -47,7 +46,7 @@ button.send{background:var(--rojo);border:none;color:#fff;border-radius:10px;pad
 </head>
 <body>
 <header>
-  <h1>🍔 LA BURGUERÍA</h1>
+  <h1>🍔 LA BURGUERÍA <span id="mesaTag"></span></h1>
   <button class="cart-btn" id="cartBtn">🛒 Carrito <span class="cart-count" id="cartCount">0</span></button>
 </header>
 
@@ -60,7 +59,6 @@ button.send{background:var(--rojo);border:none;color:#fff;border-radius:10px;pad
   <button class="send" id="btn">➤</button>
 </footer>
 
-<!-- Modal carrito -->
 <div class="modal" id="cartModal">
   <div class="modal-content">
     <button class="close-btn" id="closeCart">×</button>
@@ -75,153 +73,122 @@ button.send{background:var(--rojo);border:none;color:#fff;border-radius:10px;pad
 const $=id=>document.getElementById(id);
 let historial=[];
 let carrito=[];
-let menuData=[];
+
+/* 🪑 MESAS: viene del QR (?mesa=3) o se elige manual */
+var params=new URLSearchParams(location.search);
+let MESA=params.get('mesa')?('Mesa '+params.get('mesa')):'';
+var MODOS=['Mesa 1','Mesa 2','Mesa 3','Mesa 4','Mesa 5','Para llevar 🥡','Delivery '];
+function fijarMesa(m){
+  MESA=m;
+  var tag=$('mesaTag');if(tag)tag.textContent='🪑 '+m;
+  var sel=$('mesaSelect');if(sel)sel.remove();
+}
+function pedirMesa(){
+  if(MESA){fijarMesa(MESA);return;}
+  var div=document.createElement('div');
+  div.id='mesaSelect';
+  div.innerHTML='<span style="width:100%;text-align:center;font-size:12px;color:#aaa">¿Dónde estás comiendo hoy?</span>';
+  MODOS.forEach(function(m){
+    var b=document.createElement('button');
+    b.className='chip';b.textContent=m;
+    b.onclick=function(){fijarMesa(m);};
+    div.appendChild(b);
+  });
+  document.body.insertBefore(div,$('msgs'));
+}
+pedirMesa();
 
 function msg(t,who){
-  const d=document.createElement('div');
-  d.className='m '+who;
-  d.textContent=t;
-  $('msgs').appendChild(d);
-  $('msgs').scrollTop=1e9;
+  var d=document.createElement('div');
+  d.className='m '+who;d.textContent=t;
+  $('msgs').appendChild(d);$('msgs').scrollTop=1e9;
 }
-
+function guardarCarrito(){localStorage.setItem('carrito-burgueria',JSON.stringify(carrito));}
 function actualizarCarrito(){
-  $('cartCount').textContent=carrito.reduce((s,i)=>s+i.qty,0);
-  const items=$('cartItems');
-  items.innerHTML='';
-  let total=0;
+  $('cartCount').textContent=carrito.reduce(function(s,i){return s+i.qty;},0);
+  var items=$('cartItems');items.innerHTML='';
+  var total=0;
   if(carrito.length===0){
     items.innerHTML='<p style="text-align:center;color:#aaa;padding:20px">Tu carrito está vacío</p>';
     $('cartTotal').textContent='Total: $0';
     $('sendWhatsapp').style.display='none';
     return;
   }
-  carrito.forEach((item,i)=>{
-    const subtotal=item.precio*item.qty;
-    total+=subtotal;
-    const div=document.createElement('div');
-    div.className='cart-item';
-    div.innerHTML=`
-      <div class="cart-item-info">
-        <div class="cart-item-name">${item.item}</div>
-        <div class="cart-item-price">$${item.precio} c/u</div>
-      </div>
-      <div class="qty-controls">
-        <button class="qty-btn" onclick="cambiarQty(${i},-1)">−</button>
-        <span>${item.qty}</span>
-        <button class="qty-btn" onclick="cambiarQty(${i},1)">+</button>
-        <button class="qty-btn" onclick="quitarItem(${i})" style="background:#666">✕</button>
-      </div>
-    `;
+  carrito.forEach(function(item,i){
+    total+=item.precio*item.qty;
+    var div=document.createElement('div');div.className='cart-item';
+    div.innerHTML='<div><div class="cart-item-name">'+item.item+'</div><div class="cart-item-price">$'+item.precio.toLocaleString('es-AR')+' c/u</div></div>'+
+      '<div class="qty-controls"><button class="qty-btn" onclick="cambiarQty('+i+',-1)">−</button><span>'+item.qty+'</span>'+
+      '<button class="qty-btn" onclick="cambiarQty('+i+',1)">+</button>'+
+      '<button class="qty-btn" onclick="quitarItem('+i+')" style="background:#666">✕</button></div>';
     items.appendChild(div);
   });
   $('cartTotal').textContent='Total: $'+total.toLocaleString('es-AR');
   $('sendWhatsapp').style.display='block';
 }
-
-function cambiarQty(idx,delta){
-  carrito[idx].qty+=delta;
-  if(carrito[idx].qty<=0) carrito.splice(idx,1);
-  actualizarCarrito();
-  localStorage.setItem('carrito-burgueria',JSON.stringify(carrito));
-}
-
-function quitarItem(idx){
-  carrito.splice(idx,1);
-  actualizarCarrito();
-  localStorage.setItem('carrito-burgueria',JSON.stringify(carrito));
-}
-
+function cambiarQty(idx,delta){carrito[idx].qty+=delta;if(carrito[idx].qty<=0)carrito.splice(idx,1);actualizarCarrito();guardarCarrito();}
+function quitarItem(idx){carrito.splice(idx,1);actualizarCarrito();guardarCarrito();}
 function agregarAlCarrito(item){
-  const existe=carrito.find(c=>c.item===item.item);
-  if(existe){
-    existe.qty++;
-  }else{
-    carrito.push({...item,qty:1});
-  }
-  actualizarCarrito();
-  localStorage.setItem('carrito-burgueria',JSON.stringify(carrito));
+  var ex=carrito.find(function(c){return c.item===item.item;});
+  if(ex)ex.qty++;else carrito.push({item:item.item,precio:item.precio,qty:1});
+  actualizarCarrito();guardarCarrito();
   msg('✅ '+item.item+' agregado al carrito','bot');
 }
-
 function enviarWhatsapp(){
-  if(carrito.length===0) return;
-  const num='5491162459363'; // Cambiá por el WhatsApp real del dueño
-  let mensaje='🍔 *Nuevo pedido de LA BURGUERÍA*\n\n';
-  let total=0;
-  carrito.forEach(item=>{
-    const subtotal=item.precio*item.qty;
-    total+=subtotal;
-    mensaje+=`${item.qty}x ${item.item} ($${item.precio.toLocaleString('es-AR')})\n`;
+  if(carrito.length===0)return;
+  var num=window.WHATS||'5491100009363';
+  var mensaje='🍔 *Nuevo pedido de LA BURGUERÍA*\n';
+  mensaje+='🪑 *'+(MESA||'Sin mesa (web)')+'*\n\n';
+  var total=0;
+  carrito.forEach(function(item){
+    total+=item.precio*item.qty;
+    mensaje+=item.qty+'x '+item.item+' ($'+item.precio.toLocaleString('es-AR')+')\n';
   });
-  mensaje+=`\n*Total: $${total.toLocaleString('es-AR')}*\n\n`;
-  mensaje+='💳 Pago: efectivo / transferencia\n\n';
-  mensaje+='📲 Confirmar pedido';
-  const url='https://wa.me/'+num+'?text='+encodeURIComponent(mensaje);
-  window.open(url,'_blank');
+  mensaje+='\n*Total: $'+total.toLocaleString('es-AR')+'*\n';
+  mensaje+='💳 Pago: efectivo / transferencia\n';
+  if(MESA&&MESA.indexOf('Delivery')===0)mensaje+='📍 El cliente indica la dirección al confirmar.\n';
+  mensaje+='\n📲 Confirmar pedido';
+  window.open('https://wa.me/'+num+'?text='+encodeURIComponent(mensaje),'_blank');
 }
-
 async function enviar(t){
-  t=(t||$('inp').value).trim();
-  if(!t) return;
-  $('inp').value='';
-  msg(t,'user');
+  t=(t||$('inp').value).trim();if(!t)return;
+  $('inp').value='';msg(t,'user');
   historial.push({role:'user',content:t});
   msg('Escribiendo… 🍳','bot');
-  const esp=$('msgs').lastChild;
-  const r=await fetch('/api/ia',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({mensaje:t,historial:historial.slice(-9)})
-  }).then(r=>r.json()).catch(()=>({ok:false}));
+  var esp=$('msgs').lastChild;
+  var r=await fetch('/api/ia',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({mensaje:t,historial:historial.slice(-9),mesa:MESA})})
+    .then(function(r){return r.json();}).catch(function(){return{ok:false};});
   esp.remove();
-  const txt=r.ok?r.respuesta:'😕 Ya te atendemos… o escribinos por WhatsApp 📲';
+  var txt=r.ok?r.respuesta:'😕 Ya te atendemos… o escribinos por WhatsApp 📲';
   historial.push({role:'assistant',content:txt});
   msg(txt,'bot');
 }
-
-$('btn').onclick=()=>enviar();
-$('inp').onkeydown=e=>{if(e.key==='Enter')enviar();};
-$('cartBtn').onclick=()=>{$('cartModal').classList.add('show');actualizarCarrito();};
-$('closeCart').onclick=()=>$('cartModal').classList.remove('show');
+$('btn').onclick=function(){enviar();};
+$('inp').onkeydown=function(e){if(e.key==='Enter')enviar();};
+$('cartBtn').onclick=function(){$('cartModal').classList.add('show');actualizarCarrito();};
+$('closeCart').onclick=function(){$('cartModal').classList.remove('show');};
 $('sendWhatsapp').onclick=enviarWhatsapp;
 
-fetch('/api/local').then(r=>r.json()).then(L=>{
-  menuData=L.menu;
+fetch('/api/local').then(function(r){return r.json();}).then(function(L){
   window.WHATS=L.whatsapp;
-  msg('¡Hola! 👋 Soy el asistente de '+L.nombre+'. Tocá un plato del menú para agregarlo al carrito, o preguntame lo que necesites 🍔','bot');
-  
-  // Renderizar menú
-  const menuDiv=$('menu');
-  menuData.forEach(item=>{
-    const div=document.createElement('div');
-    div.className='item';
-    div.innerHTML=`
-      <h3>${item.item}</h3>
-      <p>${item.desc}</p>
-      <div class="precio">$${item.precio.toLocaleString('es-AR')}</div>
-      <button>Agregar al carrito</button>
-    `;
-    div.querySelector('button').onclick=()=>agregarAlCarrito(item);
+  msg('¡Hola! 👋 Soy el asistente de '+L.nombre+'. Tocá un plato para agregarlo al carrito, o preguntame lo que necesites 🍔','bot');
+  var menuDiv=$('menu');
+  L.menu.forEach(function(item){
+    var div=document.createElement('div');div.className='item';
+    div.innerHTML='<h3>'+item.item+'</h3><p>'+item.desc+'</p><div class="precio">$'+item.precio.toLocaleString('es-AR')+'</div><button>Agregar al carrito</button>';
+    div.querySelector('button').onclick=function(){agregarAlCarrito(item);};
     menuDiv.appendChild(div);
   });
-  
-  // Chips de preguntas frecuentes
-  ['¿Hacen delivery?','Medios de pago','Horario','Quiero una Doble con papas'].forEach(c=>{
-    const b=document.createElement('div');
-    b.className='chip';
-    b.textContent=c;
-    b.onclick=()=>enviar(c);
+  ['¿Hacen delivery?','Medios de pago','Horario','Quiero una Doble con papas'].forEach(function(c){
+    var b=document.createElement('div');b.className='chip';b.textContent=c;
+    b.onclick=function(){enviar(c);};
     $('chips').appendChild(b);
   });
 });
 
-// Cargar carrito guardado
-const carritoGuardado=localStorage.getItem('carrito-burgueria');
-if(carritoGuardado){
-  carrito=JSON.parse(carritoGuardado);
-  actualizarCarrito();
-}
+var cg=localStorage.getItem('carrito-burgueria');
+if(cg){try{carrito=JSON.parse(cg);actualizarCarrito();}catch(e){}}
 </script>
 </body>
 </html>
