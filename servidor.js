@@ -3,6 +3,8 @@ const path = require('path');
 require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3001;
+const { Server } = require('socket.io');
+const PEDIDOS = [];
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -41,9 +43,8 @@ if (process.env.GROQ_API_KEY) {
   const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
   const MODELOS = ['openai/gpt-oss-120b', 'llama-3.3-70b-versatile', 'meta-llama/llama-4-scout-17b-16e-instruct'];
   app.post('/api/ia', async (req, res) => {
-     const { mensaje, historial, mesa } = req.body;
+    const { mensaje, historial } = req.body;
     const messages = [{ role: 'system', content: cerebro() }];
-    if (mesa) messages.push({ role: 'system', content: 'El cliente está en: ' + mesa + '. Mencioná la mesa al confirmar y NO pidas nombre: con la mesa alcanza.' });
     (historial || []).forEach(h => messages.push(h));
     messages.push({ role: 'user', content: mensaje });
     for (const modelo of MODELOS) {
@@ -56,7 +57,57 @@ if (process.env.GROQ_API_KEY) {
   });
 }
 app.get('/api/local', (req, res) => res.json(LOCAL));
-app.listen(PORT, () => console.log('🍔 Bot de ' + LOCAL.nombre + ' en http://localhost:' + PORT));
+
+/* 🍳 COCINA EN VIVO */
+app.post('/api/pedido', (req, res) => {
+  const p = req.body || {};
+  const pedido = {
+    id: Date.now(),
+    mesa: p.mesa || 'Sin mesa',
+    items: p.items || [],
+    total: p.total || 0,
+    hora: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
+    estado: 'pendiente'
+  };
+   PEDIDOS.push(pedido);
+  io.emit('nuevo-pendiente', pedido);
+  console.log('📋 Pedido pendiente: ' + pedido.mesa + ' ($' + pedido.total + ')');
+
+  io.emit('nuevo-pedido', pedido);
+  console.log('🍳 Pedido nuevo: ' + pedido.mesa + ' ($' + pedido.total + ')');
+  res.json({ ok: true });
+});
+app.get('/api/pedidos', (req, res) => res.json(PEDIDOS));
+app.post('/api/pedido-aprobar', (req, res) => {
+  const p = PEDIDOS.find(x => x.id === req.body.id);
+  if (p && p.estado === 'pendiente') {
+    p.estado = 'aprobado';
+    io.emit('pedido-aprobado', p);
+    console.log('✅ Aprobado: ' + p.mesa);
+  }
+  res.json({ ok: true });
+});
+app.post('/api/pedido-rechazar', (req, res) => {
+  const p = PEDIDOS.find(x => x.id === req.body.id);
+  if (p && p.estado === 'pendiente') {
+    p.estado = 'rechazado';
+    io.emit('pedido-rechazado', { id: p.id });
+    console.log('❌ Rechazado: ' + p.mesa);
+  }
+  res.json({ ok: true });
+});
+app.post('/api/pedido-listo', (req, res) => {
+  const p = PEDIDOS.find(x => x.id === req.body.id);
+  if (p) { p.estado = 'listo'; io.emit('pedido-listo', { id: p.id }); }
+  res.json({ ok: true });
+});
+
+
+const server = app.listen(PORT, () => console.log('🍔 Bot de ' + LOCAL.nombre + ' en http://localhost:' + PORT));
+const io = new Server(server, { cors: { origin: '*' } });
+io.on('connection', () => console.log('🍳 Pantalla de cocina conectada'));
+
+
 
 
 
