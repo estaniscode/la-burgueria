@@ -10,7 +10,8 @@
 body{font-family:system-ui;background:var(--fondo);color:var(--texto);display:flex;flex-direction:column;height:100vh;overflow:hidden}
 header{background:var(--rojo);padding:14px 20px;display:flex;align-items:center;justify-content:space-between}
 header h1{font-size:20px;font-weight:800}
-#mesaTag{font-size:12px;background:rgba(0,0,0,.25);border-radius:999px;padding:4px 10px;margin-left:6px;vertical-align:middle}
+#mesaTag{font-size:12px;background:rgba(0,0,0,.25);border-radius:999px;padding:4px 10px;margin-left:6px;vertical-align:middle;cursor:pointer;transition:background .2s}
+#mesaTag:hover{background:rgba(0,0,0,.5)}
 .cart-btn{background:#fff;color:var(--rojo);border:none;border-radius:999px;padding:8px 16px;font-weight:700;cursor:pointer;position:relative;font-size:14px}
 .cart-count{position:absolute;top:-6px;right:-6px;background:var(--dorado);color:#000;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800}
 #msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px}
@@ -46,7 +47,7 @@ button.send{background:var(--rojo);border:none;color:#fff;border-radius:10px;pad
 </head>
 <body>
 <header>
-  <h1>🍔 LA BURGUERÍA <span id="mesaTag"></span></h1>
+  <h1>🍔 LA BURGUERÍA <span id="mesaTag" onclick="cambiarMesa()" title="Tocá para cambiar de mesa"></span></h1>
   <button class="cart-btn" id="cartBtn">🛒 Carrito <span class="cart-count" id="cartCount">0</span></button>
 </header>
 
@@ -73,24 +74,36 @@ button.send{background:var(--rojo);border:none;color:#fff;border-radius:10px;pad
 const $=id=>document.getElementById(id);
 let historial=[];
 let carrito=[];
+let MESA='';
 
-/* 🍽️ MESAS: viene del QR (?mesa=3) o se elige manual */
-var params=new URLSearchParams(location.search);
-let MESA=params.get('mesa')?('Mesa '+params.get('mesa')):'';
-var MODOS=['Mesa 1','Mesa 2','Mesa 3','Mesa 4','Mesa 5','Para llevar 🥡','Delivery '];
+/* 🪑 MESAS */
+const params=new URLSearchParams(location.search);
+const mesaParam=params.get('mesa');
+if(mesaParam) MESA='Mesa '+mesaParam;
+const MODOS=['Mesa 1','Mesa 2','Mesa 3','Mesa 4','Mesa 5','Para llevar 🥡','Delivery 🛵'];
+
 function fijarMesa(m){
   MESA=m;
-  var tag=$('mesaTag');if(tag)tag.textContent='🍽️ '+m;
-  var sel=$('mesaSelect');if(sel)sel.remove();
+  $('mesaTag').textContent='🍽️ '+m;
+  const sel=$('mesaSelect');
+  if(sel) sel.remove();
 }
+
+function cambiarMesa(){
+  MESA='';
+  $('mesaTag').textContent='';
+  pedirMesa();
+}
+
 function pedirMesa(){
   if(MESA){fijarMesa(MESA);return;}
-  var div=document.createElement('div');
+  const div=document.createElement('div');
   div.id='mesaSelect';
   div.innerHTML='<span style="width:100%;text-align:center;font-size:12px;color:#aaa">¿Dónde estás comiendo hoy?</span>';
   MODOS.forEach(function(m){
-    var b=document.createElement('button');
-    b.className='chip';b.textContent=m;
+    const b=document.createElement('button');
+    b.className='chip';
+    b.textContent=m;
     b.onclick=function(){fijarMesa(m);};
     div.appendChild(b);
   });
@@ -99,15 +112,22 @@ function pedirMesa(){
 pedirMesa();
 
 function msg(t,who){
-  var d=document.createElement('div');
-  d.className='m '+who;d.textContent=t;
-  $('msgs').appendChild(d);$('msgs').scrollTop=1e9;
+  const d=document.createElement('div');
+  d.className='m '+who;
+  d.textContent=t;
+  $('msgs').appendChild(d);
+  $('msgs').scrollTop=1e9;
 }
-function guardarCarrito(){localStorage.setItem('carrito-burgueria',JSON.stringify(carrito));}
+
+function guardarCarrito(){
+  localStorage.setItem('carrito-burgueria',JSON.stringify(carrito));
+}
+
 function actualizarCarrito(){
   $('cartCount').textContent=carrito.reduce(function(s,i){return s+i.qty;},0);
-  var items=$('cartItems');items.innerHTML='';
-  var total=0;
+  const items=$('cartItems');
+  items.innerHTML='';
+  let total=0;
   if(carrito.length===0){
     items.innerHTML='<p style="text-align:center;color:#aaa;padding:20px">Tu carrito está vacío</p>';
     $('cartTotal').textContent='Total: $0';
@@ -116,7 +136,8 @@ function actualizarCarrito(){
   }
   carrito.forEach(function(item,i){
     total+=item.precio*item.qty;
-    var div=document.createElement('div');div.className='cart-item';
+    const div=document.createElement('div');
+    div.className='cart-item';
     div.innerHTML='<div><div class="cart-item-name">'+item.item+'</div><div class="cart-item-price">$'+item.precio.toLocaleString('es-AR')+' c/u</div></div>'+
       '<div class="qty-controls"><button class="qty-btn" onclick="cambiarQty('+i+',-1)">−</button><span>'+item.qty+'</span>'+
       '<button class="qty-btn" onclick="cambiarQty('+i+',1)">+</button>'+
@@ -126,44 +147,65 @@ function actualizarCarrito(){
   $('cartTotal').textContent='Total: $'+total.toLocaleString('es-AR');
   $('sendWhatsapp').style.display='block';
 }
-function cambiarQty(idx,delta){carrito[idx].qty+=delta;if(carrito[idx].qty<=0)carrito.splice(idx,1);actualizarCarrito();guardarCarrito();}
-function quitarItem(idx){carrito.splice(idx,1);actualizarCarrito();guardarCarrito();}
+
+function cambiarQty(idx,delta){
+  carrito[idx].qty+=delta;
+  if(carrito[idx].qty<=0) carrito.splice(idx,1);
+  actualizarCarrito();
+  guardarCarrito();
+}
+
+function quitarItem(idx){
+  carrito.splice(idx,1);
+  actualizarCarrito();
+  guardarCarrito();
+}
+
 function agregarAlCarrito(item){
-  var ex=carrito.find(function(c){return c.item===item.item;});
-  if(ex)ex.qty++;else carrito.push({item:item.item,precio:item.precio,qty:1});
-  actualizarCarrito();guardarCarrito();
+  const ex=carrito.find(function(c){return c.item===item.item;});
+  if(ex) ex.qty++;
+  else carrito.push({item:item.item,precio:item.precio,qty:1});
+  actualizarCarrito();
+  guardarCarrito();
   msg('✅ '+item.item+' agregado al carrito','bot');
 }
+
 function enviarWhatsapp(){
-  if(carrito.length===0)return;
-  var num=window.WHATS||'5491100009363';
-  var mensaje='🍔 *Nuevo pedido de LA BURGUERÍA*\n';
-   mensaje+='🍽️ *'+(MESA||'Sin mesa (web)')+'*\n\n';
-  var total=0;
+  if(carrito.length===0) return;
+  const num=window.WHATS||'5491162459363';
+  let total=0;
+  carrito.forEach(function(item){total+=item.precio*item.qty;});
+  let mensaje='🍔 *Nuevo pedido de LA BURGUERÍA*\n';
+  mensaje+='🍽️ *'+(MESA||'Sin mesa (web)')+'*\n\n';
   carrito.forEach(function(item){
-    total+=item.precio*item.qty;
     mensaje+=item.qty+'x '+item.item+' ($'+item.precio.toLocaleString('es-AR')+')\n';
   });
   mensaje+='\n*Total: $'+total.toLocaleString('es-AR')+'*\n';
   mensaje+='💳 Pago: efectivo / transferencia\n';
-  if(MESA&&MESA.indexOf('Delivery')===0)mensaje+='📍 El cliente indica la dirección al confirmar.\n';
+  if(MESA&&MESA.indexOf('Delivery')===0) mensaje+='📍 El cliente indica la dirección al confirmar.\n';
   mensaje+='\n📲 Confirmar pedido';
   window.open('https://wa.me/'+num+'?text='+encodeURIComponent(mensaje),'_blank');
+  fetch('/api/pedido',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({mesa:MESA,items:carrito.map(function(i){return{item:i.item,qty:i.qty};}),total:total})}).catch(function(){});
 }
+
 async function enviar(t){
-  t=(t||$('inp').value).trim();if(!t)return;
-  $('inp').value='';msg(t,'user');
+  t=(t||$('inp').value).trim();
+  if(!t) return;
+  $('inp').value='';
+  msg(t,'user');
   historial.push({role:'user',content:t});
   msg('Escribiendo… 🍳','bot');
-  var esp=$('msgs').lastChild;
-  var r=await fetch('/api/ia',{method:'POST',headers:{'Content-Type':'application/json'},
+  const esp=$('msgs').lastChild;
+  const r=await fetch('/api/ia',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({mensaje:t,historial:historial.slice(-9),mesa:MESA})})
     .then(function(r){return r.json();}).catch(function(){return{ok:false};});
   esp.remove();
-  var txt=r.ok?r.respuesta:'😕 Ya te atendemos… o escribinos por WhatsApp 📲';
+  const txt=r.ok?r.respuesta:'😕 Ya te atendemos… o escribinos por WhatsApp 📲';
   historial.push({role:'assistant',content:txt});
   msg(txt,'bot');
 }
+
 $('btn').onclick=function(){enviar();};
 $('inp').onkeydown=function(e){if(e.key==='Enter')enviar();};
 $('cartBtn').onclick=function(){$('cartModal').classList.add('show');actualizarCarrito();};
@@ -173,24 +215,25 @@ $('sendWhatsapp').onclick=enviarWhatsapp;
 fetch('/api/local').then(function(r){return r.json();}).then(function(L){
   window.WHATS=L.whatsapp;
   msg('¡Hola! 👋 Soy el asistente de '+L.nombre+'. Tocá un plato para agregarlo al carrito, o preguntame lo que necesites 🍔','bot');
-  var menuDiv=$('menu');
+  const menuDiv=$('menu');
   L.menu.forEach(function(item){
-    var div=document.createElement('div');div.className='item';
+    const div=document.createElement('div');
+    div.className='item';
     div.innerHTML='<h3>'+item.item+'</h3><p>'+item.desc+'</p><div class="precio">$'+item.precio.toLocaleString('es-AR')+'</div><button>Agregar al carrito</button>';
     div.querySelector('button').onclick=function(){agregarAlCarrito(item);};
     menuDiv.appendChild(div);
   });
   ['¿Hacen delivery?','Medios de pago','Horario','Quiero una Doble con papas'].forEach(function(c){
-    var b=document.createElement('div');b.className='chip';b.textContent=c;
+    const b=document.createElement('div');
+    b.className='chip';
+    b.textContent=c;
     b.onclick=function(){enviar(c);};
     $('chips').appendChild(b);
   });
 });
 
-var cg=localStorage.getItem('carrito-burgueria');
+const cg=localStorage.getItem('carrito-burgueria');
 if(cg){try{carrito=JSON.parse(cg);actualizarCarrito();}catch(e){}}
 </script>
 </body>
 </html>
-
-

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>🍳 Cocina · LA BURGUERÍA</title>
+<style>
+body{margin:0;font-family:system-ui;background:#111;color:#fff;padding:16px}
+h1{text-align:center;font-size:26px;margin:8px 0 10px}
+#estado{text-align:center;font-size:13px;color:#7f9;margin-bottom:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.card{background:#1e1e1e;border:2px solid #f80;border-radius:14px;padding:14px;animation:pop .4s}
+.card.listo{border-color:#3c6;opacity:.55}
+.card h2{margin:0 0 8px;font-size:20px;color:#fc3}
+.card ul{margin:0 0 8px;padding-left:18px;font-size:16px}
+.card .total{font-weight:800;font-size:18px}
+.card .hora{float:right;color:#999;font-size:13px}
+.card button{width:100%;margin-top:10px;padding:12px;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer}
+.btn-listo{background:#3c6;color:#030}
+@keyframes pop{from{transform:scale(.7);opacity:0}to{transform:scale(1);opacity:1}}
+#vacio{text-align:center;color:#666;padding:60px 0;font-size:18px}
+.btn-aprobar{background:#3c6;color:#030}
+.btn-rechazar{background:#c33;color:#fff;margin-top:6px}
+#pendientes{margin-bottom:24px;padding-bottom:24px;border-bottom:3px solid #fc0}
+#pendientes:empty{display:none}
+h2{margin:10px 0 8px;font-size:18px;color:#fc0}
+
+</style>
+</head>
+<body>
+<h1>🍳 COCINA · LA BURGUERÍA</h1>
+<h2>📋 PEDIDOS PENDIENTES</h2>
+<div class="grid" id="pendientes"></div>
+<h2>🍳 EN COCINA</h2>
+<div id="estado">conectando…</div>
+<div id="vacio">Sin pedidos por ahora… cuando entre uno, suena 🔔</div>
+<div class="grid" id="grid"></div>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const socket=io();
+socket.on('connect',()=>{$('estado').textContent='🟢 en línea · esperando pedidos';});
+socket.on('disconnect',()=>{$('estado').textContent='🔴 reconectando…';});
+
+function beep(){
+  try{
+    const ctx=new (window.AudioContext||window.webkitAudioContext)();
+    [880,1100].forEach(function(f,i){
+      const o=ctx.createOscillator(),g=ctx.createGain();
+      o.frequency=f;o.connect(g);g.connect(ctx.destination);
+      g.gain.setValueAtTime(.3,ctx.currentTime+i*.18);
+      g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+i*.18+.17);
+      o.start(ctx.currentTime+i*.18);o.stop(ctx.currentTime+i*.18+.2);
+    });
+  }catch(e){}
+}
+
+function tarjetaPendiente(p){
+  $('vacio').style.display='none';
+  const d=document.createElement('div');
+  d.className='card';d.id='p'+p.id;d.style.borderColor='#fc0';
+  d.innerHTML='<span class="hora">'+p.hora+'</span><h2>📋 '+p.mesa+'</h2>'+
+    '<ul>'+p.items.map(function(i){return '<li>'+i.qty+'x '+i.item+'</li>';}).join('')+'</ul>'+
+    '<div class="total">$'+Number(p.total).toLocaleString('es-AR')+'</div>'+
+    '<button class="btn-aprobar" onclick="aprobar('+p.id+')">✅ APROBAR</button>'+
+    '<button class="btn-rechazar" onclick="rechazar('+p.id+')">❌ RECHAZAR</button>';
+  $('pendientes').prepend(d);
+}
+
+function tarjetaCocina(p){
+  $('vacio').style.display='none';
+  const d=document.createElement('div');
+  d.className='card';d.id='c'+p.id;
+  d.innerHTML='<span class="hora">'+p.hora+'</span><h2>🍽️ '+p.mesa+'</h2>'+
+    '<ul>'+p.items.map(function(i){return '<li>'+i.qty+'x '+i.item+'</li>';}).join('')+'</ul>'+
+    '<div class="total">$'+Number(p.total).toLocaleString('es-AR')+'</div>'+
+    '<button class="btn-listo" onclick="listo('+p.id+')">✅ LISTO</button>';
+  $('grid').prepend(d);
+}
+
+function aprobar(id){
+  fetch('/api/pedido-aprobar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})});
+}
+function rechazar(id){
+  fetch('/api/pedido-rechazar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})});
+}
+function listo(id){
+  fetch('/api/pedido-listo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})});
+}
+
+socket.on('nuevo-pendiente',function(p){tarjetaPendiente(p);beep();});
+socket.on('pedido-aprobado',function(p){
+  const card=$('p'+p.id);
+  if(card)card.remove();
+  tarjetaCocina(p);beep();
+});
+socket.on('pedido-rechazado',function(d){
+  const card=$('p'+d.id);
+  if(card)card.remove();
+});
+socket.on('pedido-listo',function(d){
+  const c=$('c'+d.id);
+  if(c){c.classList.add('listo');c.querySelector('button').textContent='✔ entregado';c.querySelector('button').disabled=true;}
+});
+
+fetch('/api/pedidos').then(function(r){return r.json();}).then(function(list){
+  list.forEach(function(p){
+    if(p.estado==='pendiente')tarjetaPendiente(p);
+    else if(p.estado==='aprobado')tarjetaCocina(p);
+    else if(p.estado==='listo'){
+      tarjetaCocina(p);
+      const c=$('c'+p.id);c.classList.add('listo');c.querySelector('button').disabled=true;c.querySelector('button').textContent='✔ entregado';
+    }
+  });
+});
+</script>
+</body>
+</html>
+
