@@ -1,0 +1,15 @@
+{
+  "name": "la-burgueria",
+  "version": "1.0.0",
+  "description": "Bot de atención para local de comida rápida",
+  "main": "servidor.js",
+  "scripts": {
+    "start": "node servidor.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "groq-sdk": "^1.5.0"
+  }
+}
