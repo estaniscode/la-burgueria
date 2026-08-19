@@ -74,13 +74,13 @@ const $=id=>document.getElementById(id);
 let historial=[];
 let carrito=[];
 
-/* 🪑 MESAS: viene del QR (?mesa=3) o se elige manual */
+/* 🍽️ MESAS: viene del QR (?mesa=3) o se elige manual */
 var params=new URLSearchParams(location.search);
 let MESA=params.get('mesa')?('Mesa '+params.get('mesa')):'';
 var MODOS=['Mesa 1','Mesa 2','Mesa 3','Mesa 4','Mesa 5','Para llevar 🥡','Delivery '];
 function fijarMesa(m){
   MESA=m;
-  var tag=$('mesaTag');if(tag)tag.textContent='🪑 '+m;
+  var tag=$('mesaTag');if(tag)tag.textContent='🍽️ '+m;
   var sel=$('mesaSelect');if(sel)sel.remove();
 }
 function pedirMesa(){
@@ -138,7 +138,7 @@ function enviarWhatsapp(){
   if(carrito.length===0)return;
   var num=window.WHATS||'5491100009363';
   var mensaje='🍔 *Nuevo pedido de LA BURGUERÍA*\n';
-  mensaje+='🪑 *'+(MESA||'Sin mesa (web)')+'*\n\n';
+   mensaje+='🍽️ *'+(MESA||'Sin mesa (web)')+'*\n\n';
   var total=0;
   carrito.forEach(function(item){
     total+=item.precio*item.qty;
