@@ -41,8 +41,9 @@ if (process.env.GROQ_API_KEY) {
   const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
   const MODELOS = ['openai/gpt-oss-120b', 'llama-3.3-70b-versatile', 'meta-llama/llama-4-scout-17b-16e-instruct'];
   app.post('/api/ia', async (req, res) => {
-    const { mensaje, historial } = req.body;
+     const { mensaje, historial, mesa } = req.body;
     const messages = [{ role: 'system', content: cerebro() }];
+    if (mesa) messages.push({ role: 'system', content: 'El cliente está en: ' + mesa + '. Mencioná la mesa al confirmar y NO pidas nombre: con la mesa alcanza.' });
     (historial || []).forEach(h => messages.push(h));
     messages.push({ role: 'user', content: mensaje });
     for (const modelo of MODELOS) {
