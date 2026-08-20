@@ -4,7 +4,32 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 const { Server } = require('socket.io');
-const PEDIDOS = [];
+
+/* ☁️ SUPABASE — base de datos en la nube (Parche A) */
+const SUPABASE_URL = process.env.SUPABASE_URL || '';
+const SUPABASE_KEY = process.env.SUPABASE_KEY || '';
+const SB = !!(SUPABASE_URL && SUPABASE_KEY);
+async function sb(ruta, metodo, cuerpo) {
+  const headers = {
+    apikey: SUPABASE_KEY,
+    Authorization: 'Bearer ' + SUPABASE_KEY,
+    'Content-Type': 'application/json'
+  };
+  if (cuerpo) headers.Prefer = 'return=representation';
+  const r = await fetch(SUPABASE_URL + '/rest/v1/' + ruta, {
+    method: metodo,
+    headers: headers,
+    body: cuerpo ? JSON.stringify(cuerpo) : undefined
+  });
+  const texto = await r.text();
+  if (!r.ok) { console.log('⚠️ Supabase error ' + r.status + ': ' + texto); return []; }
+  try { return texto ? JSON.parse(texto) : []; } catch (e) { return []; }
+}
+
+async function cambiarEstado(id, estado) {
+  if (SB) await sb('pedidos?id=eq.' + id, 'PATCH', { estado: estado });
+}
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -43,8 +68,9 @@ if (process.env.GROQ_API_KEY) {
   const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
   const MODELOS = ['openai/gpt-oss-120b', 'llama-3.3-70b-versatile', 'meta-llama/llama-4-scout-17b-16e-instruct'];
   app.post('/api/ia', async (req, res) => {
-    const { mensaje, historial } = req.body;
+    const { mensaje, historial, mesa } = req.body;
     const messages = [{ role: 'system', content: cerebro() }];
+    if (mesa) messages.push({ role: 'system', content: 'El cliente está en: ' + mesa + '. Mencioná la mesa al confirmar el pedido y NO pidas nombre ni apellido: con la mesa alcanza.' });
     (historial || []).forEach(h => messages.push(h));
     messages.push({ role: 'user', content: mensaje });
     for (const modelo of MODELOS) {
@@ -56,10 +82,11 @@ if (process.env.GROQ_API_KEY) {
     res.json({ ok: false });
   });
 }
+
 app.get('/api/local', (req, res) => res.json(LOCAL));
 
-/* 🍳 COCINA EN VIVO */
-app.post('/api/pedido', (req, res) => {
+/* 🍳 COCINA EN VIVO + ☁️ SUPABASE */
+app.post('/api/pedido', async (req, res) => {          /* Parche B */
   const p = req.body || {};
   const pedido = {
     id: Date.now(),
@@ -69,45 +96,61 @@ app.post('/api/pedido', (req, res) => {
     hora: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
     estado: 'pendiente'
   };
-   PEDIDOS.push(pedido);
+  if (SB) await sb('pedidos', 'POST', pedido);          /* Parche C: guarda en la nube */
   io.emit('nuevo-pendiente', pedido);
   console.log('📋 Pedido pendiente: ' + pedido.mesa + ' ($' + pedido.total + ')');
-
-  io.emit('nuevo-pedido', pedido);
-  console.log('🍳 Pedido nuevo: ' + pedido.mesa + ' ($' + pedido.total + ')');
-  res.json({ ok: true });
-});
-app.get('/api/pedidos', (req, res) => res.json(PEDIDOS));
-app.post('/api/pedido-aprobar', (req, res) => {
-  const p = PEDIDOS.find(x => x.id === req.body.id);
-  if (p && p.estado === 'pendiente') {
-    p.estado = 'aprobado';
-    io.emit('pedido-aprobado', p);
-    console.log('✅ Aprobado: ' + p.mesa);
-  }
-  res.json({ ok: true });
-});
-app.post('/api/pedido-rechazar', (req, res) => {
-  const p = PEDIDOS.find(x => x.id === req.body.id);
-  if (p && p.estado === 'pendiente') {
-    p.estado = 'rechazado';
-    io.emit('pedido-rechazado', { id: p.id });
-    console.log('❌ Rechazado: ' + p.mesa);
-  }
-  res.json({ ok: true });
-});
-app.post('/api/pedido-listo', (req, res) => {
-  const p = PEDIDOS.find(x => x.id === req.body.id);
-  if (p) { p.estado = 'listo'; io.emit('pedido-listo', { id: p.id }); }
   res.json({ ok: true });
 });
 
+app.get('/api/pedidos', async (req, res) => {           /* Parche D: lee de la nube */
+  if (!SB) return res.json([]);
+  const rows = await sb('pedidos?order=creado.asc');
+  res.json(rows);
+});
+
+app.post('/api/pedido-aprobar', async (req, res) => {   /* Parche E */
+  const id = req.body.id;
+  if (SB) {
+    const rows = await sb('pedidos?id=eq.' + id);
+    const p = rows[0];
+    if (p && p.estado === 'pendiente') {
+      await cambiarEstado(id, 'aprobado');
+      p.estado = 'aprobado';
+      io.emit('pedido-aprobado', p);
+      console.log('✅ Aprobado: ' + p.mesa);
+    }
+  }
+  res.json({ ok: true });
+});
+
+app.post('/api/pedido-rechazar', async (req, res) => {  /* Parche F */
+  const id = req.body.id;
+  if (SB) {
+    await cambiarEstado(id, 'rechazado');
+    io.emit('pedido-rechazado', { id: id });
+    console.log('❌ Rechazado: ' + id);
+  }
+  res.json({ ok: true });
+});
+
+app.post('/api/pedido-listo', async (req, res) => {     /* Parche G */
+  const id = req.body.id;
+  if (SB) {
+    await cambiarEstado(id, 'listo');
+    io.emit('pedido-listo', { id: id });
+  }
+  res.json({ ok: true });
+});
 
 const server = app.listen(PORT, () => console.log('🍔 Bot de ' + LOCAL.nombre + ' en http://localhost:' + PORT));
 const io = new Server(server, { cors: { origin: '*' } });
 io.on('connection', () => console.log('🍳 Pantalla de cocina conectada'));
 
-
+/* 🧹 Parche H: limpieza automática de pedidos de +30 días */
+if (SB) {
+  const hace30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  sb('pedidos?creado=lt.' + hace30, 'DELETE').then(() => console.log('🧹 Pedidos de +30 días eliminados'));
+}
 
 
 
